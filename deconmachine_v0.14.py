@@ -258,10 +258,11 @@ def read_fasta(fasta, sanitize=None):
     if fasta is not None:
         print("Loading {}".format(fasta))
         record_dict = SeqIO.to_dict(SeqIO.parse(fasta, "fasta"))
+    for seq_id in record_dict:
+        record_dict[seq_id] = _populate_seq_annotations(record_dict[seq_id])
     if sanitize is True:
-        for seq in record_dict:
-            _populate_seq_annotations(record_dict[seq])
-            seq_id = record_dict[seq].id
+        for seq_id in record_dict:
+            seq_id = record_dict[seq_id].id
             if [s for s in ["=", "|", " "] if s in seq_id]:
                 raise ValueError(
                     'FASTA file cannot contain spaces or nonstandard characters:\n{}\n{}'.format(fasta ,seq_id))
@@ -358,8 +359,10 @@ def tag_coverage(df_in, seq_dict):
     df = df_in.copy()
     for seq in [seq_dict[seq] for seq in seq_dict]:
         seq_info = df.loc[seq.id]
-        seq.id = "{}|Cov={}_Len={}".format(seq.id, seq_info.Avg_fold, seq_info.Length)
         seq.annotations["coverage"] = seq_info.Avg_fold
+
+        seq.id = "{}|Cov={}_Len={}".format(seq.id, seq_info.Avg_fold, seq_info.Length)
+        # seq.id = "{}|Cov={}_Len={}".format(seq.id, seq.annotations['coverage'], seq.annotations['contiglen'])
         seq.description = ""
     return seq_dict
 
@@ -665,13 +668,17 @@ def parse_uniprot(dmnd_results, record_dict, out_dir):
             evalue = dmnd_split[1]
             init_taxid = dmnd_split[2]
             header = dmnd_split[3]
-            taxid = taxid_from_uniprot(record_dict[header])
-            if taxid != init_taxid and taxid is not None:
-                print("TaxID Mismatch\nOriginal: {} New: {}".format(init_taxid, taxid))
-            if taxid is None and init_taxid is not None:
-                print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-
-            new_dmnd_line = "{}\t{}\t{}\t{}".format(contig_id, evalue, taxid, header)
+            unitaxid = taxid_from_uniprot(record_dict[header])
+            if unitaxid != init_taxid and unitaxid is not None:
+                print("TaxID Mismatch\nOriginal: {} New: {}".format(init_taxid, unitaxid))
+                taxidout = unitaxid
+            if unitaxid is None and init_taxid is not None:
+                print("Keeping initial taxon ID for {}".format(contig_id))
+                taxidout = init_taxid
+            if unitaxid is None and init_taxid is None:
+                print("No match found for {}".format(contig_id))
+            new_dmnd_line = "{}\t{}\t{}\t{}".format(contig_id, evalue,
+                                                    taxidout, header)
             new_dmnd.append(new_dmnd_line)
     dmnd_out = os.path.join(out_dir, "uniref_dmnd.out")
     with open(dmnd_out, "w") as g:
@@ -898,20 +905,23 @@ def write_single_fastas(passing_seqs, assembly):
         # print(seq.description)
         # print(seq.annotations)
         seqano = seq.annotations
-        ano_id = "{}|{}|{}|Cov={}_Len={}_TrimLen={}_ExScr={}_Score={}".format(
+        ano_id = "{}|{}|{}|Cov={}_Len={}_TrimLen={}_ExScr={}_Score={}{}".format(
             specimen_name,
             seqano['ref'],
             seqano['contig'],
+
             seqano['cov'],
             seqano['contiglen'],
             seqano['trimlen'],
+            seqano['exscore'],
+
             seqano['score'],
-            seqano['tag'],
+            seqano['tag']
             )
         print(ano_id)
         finn = "{}|{}|{}".format(specimen_name, seq.name, seq.id)
-        seq.id = finn
-        print(finn)
+        seq.id = ano_id
+        # print(finn)
         seq_path = os.path.join(single_fastas, "{}.fa".format(finn))
         seq.description = ''
         # print("")
@@ -1008,12 +1018,12 @@ for t in times:
 ##############################################################################
 
 
-asmbly = read_fasta(assembly[0], sanitize=True)
-exonerate_results_df = parse_exonerate(
-    ["/Users/MaddisonLab/Documents/JMP/DeconMachine/decon_out_SiagonaCLC_head/SiagonaCLC_head.hits.fa"], asmbly)
-
-sync_annotations(exonerate_results_df, asmbly)
-
+# asmbly = read_fasta(assembly[0], sanitize=True)
+# exonerate_results_df = parse_exonerate(
+#     ["/Users/MaddisonLab/Documents/JMP/DeconMachine/decon_out_SiagonaCLC_head/SiagonaCLC_head.hits.fa"], asmbly)
+#
+# sync_annotations(exonerate_results_df, asmbly)
+#
 
 
 # *$*$*$*$*$*$*$*$*$
