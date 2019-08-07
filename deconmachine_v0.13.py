@@ -111,16 +111,15 @@ def arguments():
         out_dir = "decon_out_{}".format(assembly.split(".")[0])
 
 
-
-def args_test_quick():
+def args_test_Lindro():
     global assembly, cov_file, ref, dmnd_db, sim_score, min_cov, cov_factor, taxon, outfile, rejected, out_dir, threads, include_ids, exclude_ids, use_uniref, uniref50_fasta
 
-    assembly = ["/Users/MaddisonLab/Documents/JMP/DeconMachine/Hoquedela_DNA3178_LIB0139.fas"]
-    cov_file = ["/Users/MaddisonLab/Documents/JMP/DeconMachine/Hoquedela_DNA3178_LIB0139.covstats"]
-    ref = "/Users/MaddisonLab/Documents/JMP/DeconMachine/Asaphidion_yukonense_8gene.fas"
-    dmnd_db = "/Users/MaddisonLab/Documents/JMP/DeconMachine/uniref50_plus_taxonomy.dmnd"
-    # dmnd_db = "/Users/MaddisonLab/Documents/JMP/DeconMachine/swissprot_plus_taxonomy.dmnd"
-    uniref50_fasta = "/Users/MaddisonLab/Documents/JMP/DeconMachine/uniref50.fasta.gz"
+    assembly = ["/Users/maddisonlab/Documents/James/DeconMachine/new_assemblies/Idiomorphus_DNA4756_LIB0236.fas"]
+    cov_file = ["/Users/maddisonlab/Documents/James/DeconMachine/new_covstats/Idiomorphus_DNA4756_LIB0236.covstats"]
+    ref = "/Users/maddisonlab/Documents/James/DeconMachine/Asaphidion_yukonense_8gene.fas"
+    dmnd_db = "/Users/maddisonlab/Documents/James/DeconMachine/uniref50_plus_taxonomy.dmnd"
+    # dmnd_db = "/Users/maddisonlab/Documents/James/DeconMachine/swissprot_plus_taxonomy.dmnd"
+    uniref50_fasta = "/Users/maddisonlab/Documents/James/DeconMachine/uniref50.fasta.gz"
 
     use_uniref = True
     # use_uniref = False  # True
@@ -136,6 +135,36 @@ def args_test_quick():
     rejected = "rejected.out.fa"
 
     contam_out = "contam.out.fasta"
+
+
+def args_test_quick():
+    global assembly, cov_file, ref, dmnd_db, sim_score, min_cov, cov_factor, taxon, outfile, rejected, out_dir, threads, include_ids, exclude_ids, use_uniref, uniref50_fasta
+    #
+    # assembly = ["/Users/MaddisonLab/Documents/JMP/DeconMachine/Hoquedela_DNA3178_LIB0139.fas"]
+    # cov_file = ["/Users/MaddisonLab/Documents/JMP/DeconMachine/Hoquedela_DNA3178_LIB0139.covstats"]
+    ref = "/Users/MaddisonLab/Documents/JMP/DeconMachine/Asaphidion_yukonense_8gene.fas"
+    dmnd_db = "/Users/MaddisonLab/Documents/JMP/DeconMachine/uniref50_plus_taxonomy.dmnd"
+    # dmnd_db = "/Users/MaddisonLab/Documents/JMP/DeconMachine/swissprot_plus_taxonomy.dmnd"
+    uniref50_fasta = "/Users/MaddisonLab/Documents/JMP/DeconMachine/uniref50.fasta.gz"
+
+    assembly, cov_file = read_inputs(
+        "/Users/MaddisonLab/Documents/JMP/DeconMachine/test_set_in.txt",
+        "/Users/MaddisonLab/Documents/JMP/DeconMachine/test_set_covs.txt")
+
+    use_uniref = True
+    # use_uniref = False  # True
+
+    sim_score = 80
+    min_cov = 10
+    cov_factor = 0.2
+    include_ids = None
+    exclude_ids = 2
+    threads = 6
+
+    # outfile = "decon.out.fa"
+    # rejected = "rejected.out.fa"
+    #
+    # contam_out = "contam.out.fasta"
 
 
 def args_test_quick2():  # Mini test set with Siagona
@@ -155,13 +184,13 @@ def args_test_quick2():  # Mini test set with Siagona
     cov_factor = 0.2
     include_ids = None
     exclude_ids = 2
-    threads = 1
+    threads = 4
 
-    outfile = "decon.out.fa"
-    rejected = "rejected.out.fa"
+    # outfile = "decon.out.fa"
+    # rejected = "rejected.out.fa"
     uniref50_fasta = "/Users/maddisonlab/Documents/James/DeconMachine/uniref50.fasta.gz"
 
-    contam_out = "contam.out.fasta"
+    # contam_out = "contam.out.fasta"
     # assembly, cov_file = read_inputs("/Users/maddisonlab/Documents/James/DeconMachine/test_set_in.txt",
     #             "/Users/maddisonlab/Documents/James/DeconMachine/test_set_in_cov.txt")
 
@@ -231,6 +260,7 @@ def read_fasta(fasta, sanitize=None):
         record_dict = SeqIO.to_dict(SeqIO.parse(fasta, "fasta"))
     if sanitize is True:
         for seq in record_dict:
+            _populate_seq_annotations(record_dict[seq])
             seq_id = record_dict[seq].id
             if [s for s in ["=", "|", " "] if s in seq_id]:
                 raise ValueError(
@@ -239,12 +269,19 @@ def read_fasta(fasta, sanitize=None):
     return record_dict
 
 
-def seqs_to_df(df_in, seqs):
-    df = df_in.copy()
-    for seq in seqs:
-        sequence = seqs[seq].seq
-        seq_id = seqs[seq].id
-        df.loc[[seq_id]]
+def _populate_seq_annotations(seq_record):
+    seq_record.annotations["contig"] = seq_record.id
+    seq_record.annotations["contiglen"] = len(seq_record)
+
+    return seq_record
+
+
+# def seqs_to_df(df_in, seqs):
+#     df = df_in.copy()
+#     for seq in seqs:
+#         sequence = seqs[seq].seq
+#         seq_id = seqs[seq].id
+#         df.loc[[seq_id]]
 
 
 def min_cov_filter(df_in, min_cov, status):
@@ -278,7 +315,7 @@ def prepare_exonerate(out_dir, ref_dict):
 
 def generate_exonerate_cmd(assembly, param_tuple, hits, score_min=None, model=None):
     if score_min == None:
-        score_min = "300"
+        score_min = "400"
     if score_min == None:
         score_min = "est2genome"
     commands = []
@@ -294,7 +331,7 @@ def generate_exonerate_cmd(assembly, param_tuple, hits, score_min=None, model=No
 
 
 def _generate_exonerate_cmd(query, target, hits, out_file, score_min, model="est2genome"):
-    command = "while true; do exonerate {} {} -m {} -n {} --score {} --extensionthreshold 1000 --ryo \">%qi %ti_TrimLen=%tal_ExScr=%s_Cord=%tab_%tae\\n%ts\" --verbose 0 --showalignment no --showvulgar no > {} && break ; sleep 10; done".format(
+    command = "while true; do exonerate {} {} -m {} -n {} --score {} --extensionthreshold 1000 --ryo \">%qi %ti_TrimLen=%tal_ExScr=%s_Coord=%tab_%tae\\n%tas\" --verbose 0 --showalignment no --showvulgar no > {} && break ; sleep 10; done".format(
         query, target, model, hits, score_min, out_file)
     return command
 
@@ -322,8 +359,32 @@ def tag_coverage(df_in, seq_dict):
     for seq in [seq_dict[seq] for seq in seq_dict]:
         seq_info = df.loc[seq.id]
         seq.id = "{}|Cov={}_Len={}".format(seq.id, seq_info.Avg_fold, seq_info.Length)
+        seq.annotations["coverage"] = seq_info.Avg_fold
         seq.description = ""
     return seq_dict
+
+
+def sync_annotations(exdf_in, asbly_dict):
+    """"""
+    df = exdf_in.copy()
+    # seq_df = df['Sequence']
+    # seq.annotations["seqid"] = seq.id
+    # print(seq_df)
+    for seq in asbly_dict:
+        seqrec = asbly_dict[seq]
+        #pnt = df.loc[df.Ref == seqrec.annotations['contig']]
+        print(seqrec.annotations['contig'])
+
+    # df = df_in.copy()
+    # for seq in seq_ids:
+    #     if df.loc[seq, 'Status'] == 0:
+    #         df.loc[df.index == seq, 'Status'] = status
+    #     else:
+    #         print("SKIPPING {}".format(seq))
+    #
+    # return df
+
+
 
 
 def write_filtered_fasta(df_in, seq_dict, assembly, out_type, out_dir):
@@ -480,13 +541,14 @@ def parse_exonerate(exonerate_files, assembly):
     print("\tLoading sequences")
     locus_list = []
     locusdf_list = []
-    print("Done loading {}".format(assembly))
+    print("Done loading {}")  # .format(assembly))
 
     for out_file in exonerate_files:
         hits_dict = {}
         if os.stat(out_file).st_size == 0:
             continue
         for seq_record in SeqIO.parse(out_file, "fasta"):
+            print("Parse_exonerate Seq_Record")
             description = seq_record.description.split(" ")[1]
             cov_match = float(
                 re.search("\|Cov=([0-9.]*)_", description).group(1))
@@ -496,14 +558,36 @@ def parse_exonerate(exonerate_files, assembly):
                 re.search("_TrimLen=([0-9]*)_", description).group(1))
             exscore_match = int(
                 re.search("_ExScr=([0-9]*)_", description).group(1))
-
+            # coord_match = int(  #
+            #     re.search("_Coord=([0-9]*_[0-9]*)_", description).group(1))
             new_ids = seq_record.description.split(" ")
             contig_id = new_ids[1].split("|")[0]
+
+            seq_record.annotations['ref'] = seq_record.id
+            seq_record.annotations['hitlen'] = len(seq_record)
+            seq_record.annotations['contiglen'] = len_match
+            seq_record.annotations['cov'] = cov_match
+            seq_record.annotations['trimlen'] = trimlen_match
+            seq_record.annotations['exscore'] = exscore_match
+            seq_record.annotations['contig'] = contig_id
+            # seq_record.annotations['coord'] = coord_match
+
             new_id = "|".join(new_ids)
-            hits_dict = {'SeqID': new_id, 'Contig':contig_id, 'Ref': seq_record.id,
-                    'Cov': cov_match, 'Len': len_match, 'TrimLen': trimlen_match, 'ExonerateScore' : exscore_match,
-                    'Sequence': seq_record, 'TopCov': False, 'TopLen': False, 'TopExScore': False}
+            hits_dict = {'SeqID': new_id,
+                         'Contig': contig_id,
+                         'Ref': seq_record.id,
+                         'Cov': cov_match,
+                         'Len': len_match,
+                         'TrimLen': trimlen_match,
+                         'ExonerateScore': exscore_match,
+                         'Sequence': seq_record,
+                         'TopCov': False,
+                         'TopLen': False,
+                         'TopExScore': False}
+
             locus_list.append(hits_dict)
+            print(seq_record)
+            print("")
 
     all_hits_df = pd.DataFrame(locus_list)
 
@@ -511,7 +595,6 @@ def parse_exonerate(exonerate_files, assembly):
     df.set_index('SeqID', inplace=True)
 
     return df, all_hits_df
-
 
 def df_to_list(df_in, ids_only=None, seq_col="Sequence"):
     df = df_in.copy()
@@ -583,8 +666,11 @@ def parse_uniprot(dmnd_results, record_dict, out_dir):
             init_taxid = dmnd_split[2]
             header = dmnd_split[3]
             taxid = taxid_from_uniprot(record_dict[header])
-            if taxid != init_taxid:
+            if taxid != init_taxid and taxid is not None:
                 print("TaxID Mismatch\nOriginal: {} New: {}".format(init_taxid, taxid))
+            if taxid is None and init_taxid is not None:
+                print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+
             new_dmnd_line = "{}\t{}\t{}\t{}".format(contig_id, evalue, taxid, header)
             new_dmnd.append(new_dmnd_line)
     dmnd_out = os.path.join(out_dir, "uniref_dmnd.out")
@@ -597,6 +683,7 @@ def parse_uniprot(dmnd_results, record_dict, out_dir):
 def taxid_from_uniprot(header):
     taxid = re.search(" TaxID=([0-9.]*) ", header).group(1)
     return taxid
+
 
 def write_final_fasta(df_in, seq_dict, assembly, out_type, out_dir):
     df = df_in.copy()
@@ -618,8 +705,6 @@ def main(assembly, cov_file, uniref_id_dict, min_cov):
 
     print("Beginning main")
     df = process_cov(cov_file)
-
-    # logger.info(df.head())
 
     print("Load assembly")
     assembly_dict = read_fasta(assembly, sanitize=True)
@@ -655,6 +740,12 @@ def main(assembly, cov_file, uniref_id_dict, min_cov):
     print("Processing Exonerate results")
     exonerate_results_df, exonerate_TopCov_df = parse_exonerate(exonerate_files, filtered_assembly) # Include all hits for calculating preliminary coverage
 
+    for seq in assembly_dict:
+        print(assembly_dict[seq].annotations)
+
+    for seq in exonerate_results_df['Sequence']:
+        print(seq)
+
     print("Updating database for Exonerate results")
     exonerate_for_update = df_to_list(exonerate_results_df, ids_only = True)
 
@@ -680,7 +771,7 @@ def main(assembly, cov_file, uniref_id_dict, min_cov):
         dmnd_results = parse_uniprot(init_dmnd_results, uniref_id_dict, out_dir)
 
     print("Checking for taxonomy matches")
-    contam_ids = read_taxon_file([2, 4751], [2759], dmnd_results)
+    contam_ids = read_taxon_file([2, 4751, 33090], [2759], dmnd_results)
 
     print("Updating database with clean sequences")
     clean_df = add_contam_status(match_df, contam_ids, "Contam")
@@ -723,16 +814,17 @@ def main(assembly, cov_file, uniref_id_dict, min_cov):
     #     dna_rep = "{}_LIB".format(dna_number)
     #     specimen_name = re.sub(r'LIB', dna_rep, assembly)
 
-    os.makedirs(single_fastas, exist_ok=True)
-    for seq in passing_seqs:
-        finn = "{}_{}"
-
-        seq_path = os.path.join(single_fastas, "{}.txt".format(seq.id, seq.description))
-        # seq.id = "{}_{}|{}".format(specimen_name, seq.id, seq.description.split("|")[0])
-        # seq.id = "{}|#|{}|#|{}".format(specimen_name, seq.id, seq.description)
-
-        # seq.description = ''
-        SeqIO.write(seq, seq_path, "fasta")
+    # os.makedirs(single_fastas, exist_ok=True)
+    # for seq in passing_seqs:
+    #     finn = "{}_{}"
+    #
+    #     print(seq)
+    #     seq_path = os.path.join(single_fastas, "{}.txt".format(seq.id, seq.description))
+    #     # seq.id = "{}_{}|{}".format(specimen_name, seq.id, seq.description.split("|")[0])
+    #     # seq.id = "{}|#|{}|#|{}".format(specimen_name, seq.id, seq.description)
+    #
+    #     # seq.description = ''
+    #     SeqIO.write(seq, seq_path, "fasta")
 
 
     ########## GRAPHING BLOCK ##########
@@ -799,18 +891,32 @@ def write_single_fastas(passing_seqs, assembly):
 
     os.makedirs(single_fastas, exist_ok=True)
     for seq in passing_seqs:
-        print("")
-        print(seq)
-        print("id")
-        print(seq.id)
-        print(seq.description)
-        print("des")
-        print("")
+        # print("")
+        # print("")
+        # print(seq)
+        # print(seq.id)
+        # print(seq.description)
+        # print(seq.annotations)
+        seqano = seq.annotations
+        ano_id = "{}|{}|{}|Cov={}_Len={}_TrimLen={}_ExScr={}_Score={}".format(
+            specimen_name,
+            seqano['ref'],
+            seqano['contig'],
+            seqano['cov'],
+            seqano['contiglen'],
+            seqano['trimlen'],
+            seqano['score'],
+            seqano['tag'],
+            )
+        print(ano_id)
         finn = "{}|{}|{}".format(specimen_name, seq.name, seq.id)
         seq.id = finn
+        print(finn)
         seq_path = os.path.join(single_fastas, "{}.fa".format(finn))
-        print(seq_path)
         seq.description = ''
+        # print("")
+        # print("")
+        # print(seq_path)
         SeqIO.write(seq, seq_path, "fasta")
 
 
@@ -823,10 +929,14 @@ def bbb(row):
     if row['Tag'] is not False:
         tag = row['Tag']
         seq.id = "{}_Score={}_{}".format(seq_des, score, tag, seq_des)
+        seq.annotations['tag'] = "_{}".format(row['Tag'])
+        seq.annotations['score'] = score
     else:
         # tag = "none"
         # seq.id = "{}_Score={}".format(seq_id, score)
         seq.id = "{}_Score={}".format(seq_des, score)
+        seq.annotations['tag'] = "".format(row['Tag'])
+        seq.annotations['score'] = score
 
     return seq
 
@@ -856,10 +966,9 @@ def score(df_in):
 
 
 # args_test()
-# args_test_quick()
-args_test_quick2()
-# Siagona_test()
-# Trachysarus_test()
+args_test_quick()
+# args_test_quick2()
+# args_test_Lindro()
 
 
 times = []
@@ -896,6 +1005,14 @@ for t in times:
 
 
 
+##############################################################################
+
+
+asmbly = read_fasta(assembly[0], sanitize=True)
+exonerate_results_df = parse_exonerate(
+    ["/Users/MaddisonLab/Documents/JMP/DeconMachine/decon_out_SiagonaCLC_head/SiagonaCLC_head.hits.fa"], asmbly)
+
+sync_annotations(exonerate_results_df, asmbly)
 
 
 
